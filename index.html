@@ -123,7 +123,11 @@
         el.textContent = "Failed to load dates. Please try again later.";
       });
     });
-</script><!-- Gymnastics Holiday Club Booking Form — Part 3 -->
+</script><!-- PayPal Smart Buttons -->
+<div id="paypal-button-container" style="margin-top: 30px;"></div>
+
+<!-- Gymnastics Holiday Club Booking Form — Part 3 -->
+<script src="https://www.paypal.com/sdk/js?client-id=YOUR_CLIENT_ID&currency=GBP"></script>
 <script>
 const form = document.getElementById("holidayClubForm");
 
@@ -175,7 +179,6 @@ paypal.Buttons({
       const medicalInfo = document.querySelector('input[name="medical_info"]').value;
       const photoConsent = document.querySelector('select[name="photo_consent"]').value;
 
-      // Send confirmation email using EmailJS
       emailjs.send("service_eq9g419", "template_kw0uijj", {
         parent_email: parentEmail,
         parent_phone: parentPhone,

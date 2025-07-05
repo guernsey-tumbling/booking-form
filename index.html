@@ -1,0 +1,265 @@
+<!-- Gymnastics Holiday Club Booking Form – Part 1 -->
+
+<form id="holidayClubForm" style="max-width: 700px; margin: 0 auto; font-family: Arial, sans-serif; font-size: 16px; color: #000;">
+  <h2 style="text-align:center; margin-bottom: 25px;">Gymnastics Holiday Club Booking</h2>
+
+  <!-- Child Details -->
+  <div id="child-sections">
+    <div class="child-section" data-child="1">
+      <h3>Child 1</h3>
+      <label>Full Name: <input type="text" name="child1_name" required></label><br><br>
+      <label>Date of Birth: <input type="date" name="child1_dob" required></label><br><br>
+      <div class="dates-container" id="child1-dates-section">
+        <strong>Select Dates:</strong><br>
+        <div class="dates-loading">Loading dates...</div>
+      </div>
+      <br><hr><br>
+    </div>
+
+    <div class="child-section" data-child="2">
+      <h3>Child 2 (optional)</h3>
+      <label>Full Name: <input type="text" name="child2_name"></label><br><br>
+      <label>Date of Birth: <input type="date" name="child2_dob"></label><br><br>
+      <div class="dates-container" id="child2-dates-section">
+        <strong>Select Dates:</strong><br>
+        <div class="dates-loading">Loading dates...</div>
+      </div>
+      <br><hr><br>
+    </div>
+
+    <div class="child-section" data-child="3">
+      <h3>Child 3 (optional)</h3>
+      <label>Full Name: <input type="text" name="child3_name"></label><br><br>
+      <label>Date of Birth: <input type="date" name="child3_dob"></label><br><br>
+      <div class="dates-container" id="child3-dates-section">
+        <strong>Select Dates:</strong><br>
+        <div class="dates-loading">Loading dates...</div>
+      </div>
+      <br><hr><br>
+    </div>
+  </div>
+
+  <!-- Parent & Emergency Contact -->
+  <h3>Parent/Guardian Information</h3>
+  <label>Full Name: <input type="text" name="parent_name" required></label><br><br>
+  <label>Email Address: <input type="email" name="parent_email" required></label><br><br>
+  <label>Phone Number: <input type="tel" name="parent_phone" required></label><br><br>
+  <label>Emergency Contact Number: <input type="tel" name="emergency_contact" required></label><br><br>
+
+  <!-- Medical & Consent -->
+  <h3>Medical & Consent</h3>
+  <label>Any medical conditions? 
+    <select name="medical_condition">
+      <option value="No">No</option>
+      <option value="Yes">Yes (details below)</option>
+    </select>
+  </label><br><br>
+  <label>Please provide details if yes:<br>
+    <textarea name="medical_details" rows="3" cols="40"></textarea>
+  </label><br><br>
+
+  <label>Photo consent (club may take photos for social media): 
+    <select name="photo_consent">
+      <option value="Yes">Yes</option>
+      <option value="No">No</option>
+    </select>
+  </label><br><br>
+</form>
+<!-- Part 2: Dynamically load date checkboxes with booking caps -->
+
+<script>
+  const MAX_CAPACITY = 24;
+  const SHEET_URL = 'https://opensheet.elk.sh/1--0LQ5mm5OGJIbue349KD8ys1pL9kMtmOjppZheLsgQ/Sheet1';
+
+  function renderDates(dates, container) {
+    container.innerHTML = ""; // Clear any loading text
+
+    dates.forEach(dateObj => {
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = container.id.includes("child1") ? "child1-dates"
+                       : container.id.includes("child2") ? "child2-dates"
+                       : "child3-dates";
+      checkbox.value = dateObj.name;
+      checkbox.disabled = dateObj.spacesRemaining <= 0;
+
+      const label = document.createElement("label");
+      label.style.display = "block";
+      label.style.marginBottom = "6px";
+
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(
+        ` ${dateObj.name} (${dateObj.spacesRemaining} spaces left)`
+      ));
+
+      container.appendChild(label);
+    });
+  }
+
+  fetch(SHEET_URL)
+    .then(response => response.json())
+    .then(data => {
+      const formattedDates = data.map(row => {
+        let raw = row["Booked"] || row["booked"] || row["BOOKED"] || "0";
+        let bookedCount = Number(String(raw).trim());
+        if (isNaN(bookedCount)) bookedCount = 0;
+
+        return {
+          name: row["Date"] || row["date"] || "Unnamed Date",
+          spacesRemaining: Math.max(0, MAX_CAPACITY - bookedCount)
+        };
+      });
+
+      const child1Dates = document.getElementById("child1-dates-section");
+      const child2Dates = document.getElementById("child2-dates-section");
+      const child3Dates = document.getElementById("child3-dates-section");
+
+      renderDates(formattedDates, child1Dates);
+      renderDates(formattedDates, child2Dates);
+      renderDates(formattedDates, child3Dates);
+    })
+    .catch(error => {
+      console.error("Failed to load booking dates:", error);
+      document.querySelectorAll(".dates-loading").forEach(el => {
+        el.textContent = "Failed to load dates. Please try again later.";
+      });
+    });
+</script>
+<!-- Load EmailJS SDK -->
+<script src="https://cdn.emailjs.com/sdk/3.2.0/email.min.js"></script>
+<script>
+  emailjs.init("KchK4-sTINRLmO9v4");
+</script>
+
+<!-- Load PayPal SDK -->
+<script src="https://www.paypal.com/sdk/js?client-id=AYA4dX94mVBMmuv8VatxHhL9s5OXs1R616Zil1awoC5d83phNuiVcv2E42NWVn6IUP0Qbw0gsIjSv2Wh&currency=GBP"></script>
+
+<script>
+  function calculatePrice(selectedDates) {
+    const dailyRate = 35;
+    const weeklyRate = 160;
+    const days = selectedDates.length;
+    const weeks = Math.floor(days / 5);
+    const leftoverDays = days % 5;
+    return weeks * weeklyRate + leftoverDays * dailyRate;
+  }
+
+  function gatherBookingData() {
+    const formData = {};
+    for (let i = 1; i <= 3; i++) {
+      formData[`child${i}_name`] = document.querySelector(`input[name='child${i}_name']`)?.value || "";
+      formData[`child${i}_dob`] = document.querySelector(`input[name='child${i}_dob']`)?.value || "";
+      const selectedDates = Array.from(document.querySelectorAll(`input[name='child${i}-dates']:checked`)).map(cb => cb.value);
+      formData[`child${i}_dates`] = selectedDates;
+    }
+
+    formData.parent_name = document.querySelector("input[name='parent_name']").value;
+    formData.parent_email = document.querySelector("input[name='parent_email']").value;
+    formData.parent_phone = document.querySelector("input[name='parent_phone']").value;
+    formData.emergency_contact = document.querySelector("input[name='emergency_contact']").value;
+
+    formData.medical_condition = document.querySelector("select[name='medical_condition']").value;
+    formData.medical_details = document.querySelector("textarea[name='medical_details']").value;
+    formData.photo_consent = document.querySelector("select[name='photo_consent']").value;
+
+    return formData;
+  }
+
+  function validateForm(data) {
+    if (!data.parent_name || !data.parent_email || !data.parent_phone || !data.emergency_contact) return false;
+    for (let i = 1; i <= 3; i++) {
+      if (data[`child${i}_name`] && !data[`child${i}_dob`]) return false;
+    }
+    return true;
+  }
+
+  paypal.Buttons({
+    style: {
+      layout: 'vertical',
+      color:  'black',
+      shape:  'rect',
+      label:  'paypal'
+    },
+
+    onClick: function(data, actions) {
+      const bookingData = gatherBookingData();
+
+      if (!validateForm(bookingData)) {
+        alert("Please fill all required fields and select dates for each child.");
+        return actions.reject();
+      }
+
+      const anyDatesSelected = [bookingData.child1_dates, bookingData.child2_dates, bookingData.child3_dates].some(arr => arr.length > 0);
+      if (!anyDatesSelected) {
+        alert("Please select at least one date for booking.");
+        return actions.reject();
+      }
+
+      return actions.resolve();
+    },
+
+    createOrder: function(data, actions) {
+      const bookingData = gatherBookingData();
+      let totalAmount = 0;
+      for (let i = 1; i <= 3; i++) {
+        totalAmount += calculatePrice(bookingData[`child${i}_dates`]);
+      }
+
+      if (totalAmount <= 0) {
+        alert("No valid dates selected. Please select at least one date.");
+        return actions.reject();
+      }
+
+      return actions.order.create({
+        purchase_units: [{
+          amount: {
+            currency_code: "GBP",
+            value: totalAmount.toFixed(2)
+          }
+        }]
+      });
+    },
+
+    onApprove: function(data, actions) {
+      return actions.order.capture().then(function(details) {
+        const bookingData = gatherBookingData();
+        bookingData.transactionId = details.id;
+        bookingData.payerName = details.payer.name.given_name + " " + details.payer.name.surname;
+        bookingData.payerEmail = details.payer.email_address;
+        bookingData.paymentStatus = details.status;
+
+        bookingData.total = (
+          calculatePrice(bookingData.child1_dates) +
+          calculatePrice(bookingData.child2_dates) +
+          calculatePrice(bookingData.child3_dates)
+        ).toFixed(2);
+
+        bookingData.child1_dates = bookingData.child1_dates.join(', ');
+        bookingData.child2_dates = bookingData.child2_dates.join(', ');
+        bookingData.child3_dates = bookingData.child3_dates.join(', ');
+
+        return emailjs.send('service_eq9g419', 'template_kw0uijj', bookingData)
+          .then(function() {
+            alert("Payment successful! A confirmation email has been sent.");
+            location.reload();
+          })
+          .catch(function(error) {
+            console.error("EmailJS sending failed:", error);
+            alert("Payment succeeded, but sending confirmation email failed. Please contact us.");
+            location.reload();
+          });
+      }).catch(function(err) {
+        console.error("PayPal capture error:", err);
+        alert("Payment capture failed. Please contact support.");
+      });
+    },
+
+    onError: function(err) {
+      alert("An error occurred during payment. Please try again.");
+      console.error("PayPal error:", err);
+    }
+
+  }).render('#paypal-button-container');
+</script>
+
+<div id="paypal-button-container" style="margin-top: 20px;"></div>

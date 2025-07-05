@@ -125,141 +125,83 @@
       });
     });
 </script>
-<!-- Load EmailJS SDK -->
-<script src="https://cdn.emailjs.com/sdk/3.2.0/email.min.js"></script>
+<!-- Gymnastics Holiday Club Booking Form — Part 3 -->
 <script>
-  emailjs.init("KchK4-sTINRLmO9v4");
+const form = document.getElementById("holidayClubForm");
+
+paypal.Buttons({
+  createOrder: function(data, actions) {
+    const selectedDates = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+    const childNames = Array.from(document.querySelectorAll('input[name^="child_name"]')).map(input => input.value.trim()).filter(Boolean);
+
+    const parentEmail = document.querySelector('input[name="email"]').value;
+    const parentPhone = document.querySelector('input[name="phone"]').value;
+    const emergencyContact = document.querySelector('input[name="emergency_contact"]').value;
+    const medicalInfo = document.querySelector('input[name="medical_info"]').value;
+    const photoConsent = document.querySelector('select[name="photo_consent"]').value;
+
+    let totalDays = selectedDates.length * childNames.length;
+
+    let total = 0;
+    for (let i = 0; i < childNames.length; i++) {
+      const childDays = selectedDates.length;
+      if (childDays >= 5) {
+        total += Math.floor(childDays / 5) * 160 + (childDays % 5) * 35;
+      } else {
+        total += childDays * 35;
+      }
+    }
+
+    if (total <= 0) {
+      alert("Please select at least one date.");
+      return;
+    }
+
+    return actions.order.create({
+      purchase_units: [{
+        amount: {
+          value: total.toFixed(2)
+        },
+        description: "Gymnastics Holiday Club Booking"
+      }]
+    });
+  },
+  onApprove: function(data, actions) {
+    return actions.order.capture().then(function(details) {
+      const selectedDates = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+      const childNames = Array.from(document.querySelectorAll('input[name^="child_name"]')).map(input => input.value.trim()).filter(Boolean);
+      const childDobs = Array.from(document.querySelectorAll('input[name^="child_dob"]')).map(input => input.value);
+      const parentEmail = document.querySelector('input[name="email"]').value;
+      const parentPhone = document.querySelector('input[name="phone"]').value;
+      const emergencyContact = document.querySelector('input[name="emergency_contact"]').value;
+      const medicalInfo = document.querySelector('input[name="medical_info"]').value;
+      const photoConsent = document.querySelector('select[name="photo_consent"]').value;
+
+      // Send confirmation email using EmailJS
+      emailjs.send("service_eq9g419", "template_kw0uijj", {
+        parent_email: parentEmail,
+        parent_phone: parentPhone,
+        emergency_contact: emergencyContact,
+        child_names: childNames.join(", "),
+        child_dobs: childDobs.join(", "),
+        selected_dates: selectedDates.join(", "),
+        medical_info: medicalInfo || "None",
+        photo_consent: photoConsent,
+        total_paid: actions.order.amount ? actions.order.amount.value : ""
+      }, "KchK4-sTINRLmO9v4").then(
+        function(response) {
+          alert("Booking successful! A confirmation email has been sent.");
+          form.reset();
+        },
+        function(error) {
+          alert("Booking successful, but failed to send confirmation email.");
+        }
+      );
+    });
+  },
+  onError: function(err) {
+    console.error("PayPal error:", err);
+    alert("Payment capture failed. Please contact support.");
+  }
+}).render('#paypal-button-container');
 </script>
-
-<!-- Load PayPal SDK -->
-<script src="https://www.paypal.com/sdk/js?client-id=AYA4dX94mVBMmuv8VatxHhL9s5OXs1R616Zil1awoC5d83phNuiVcv2E42NWVn6IUP0Qbw0gsIjSv2Wh&currency=GBP"></script>
-
-<script>
-  function calculatePrice(selectedDates) {
-    const dailyRate = 35;
-    const weeklyRate = 160;
-    const days = selectedDates.length;
-    const weeks = Math.floor(days / 5);
-    const leftoverDays = days % 5;
-    return weeks * weeklyRate + leftoverDays * dailyRate;
-  }
-
-  function gatherBookingData() {
-    const formData = {};
-    for (let i = 1; i <= 3; i++) {
-      formData[`child${i}_name`] = document.querySelector(`input[name='child${i}_name']`)?.value || "";
-      formData[`child${i}_dob`] = document.querySelector(`input[name='child${i}_dob']`)?.value || "";
-      const selectedDates = Array.from(document.querySelectorAll(`input[name='child${i}-dates']:checked`)).map(cb => cb.value);
-      formData[`child${i}_dates`] = selectedDates;
-    }
-
-    formData.parent_name = document.querySelector("input[name='parent_name']").value;
-    formData.parent_email = document.querySelector("input[name='parent_email']").value;
-    formData.parent_phone = document.querySelector("input[name='parent_phone']").value;
-    formData.emergency_contact = document.querySelector("input[name='emergency_contact']").value;
-
-    formData.medical_condition = document.querySelector("select[name='medical_condition']").value;
-    formData.medical_details = document.querySelector("textarea[name='medical_details']").value;
-    formData.photo_consent = document.querySelector("select[name='photo_consent']").value;
-
-    return formData;
-  }
-
-  function validateForm(data) {
-    if (!data.parent_name || !data.parent_email || !data.parent_phone || !data.emergency_contact) return false;
-    for (let i = 1; i <= 3; i++) {
-      if (data[`child${i}_name`] && !data[`child${i}_dob`]) return false;
-    }
-    return true;
-  }
-
-  paypal.Buttons({
-    style: {
-      layout: 'vertical',
-      color:  'black',
-      shape:  'rect',
-      label:  'paypal'
-    },
-
-    onClick: function(data, actions) {
-      const bookingData = gatherBookingData();
-
-      if (!validateForm(bookingData)) {
-        alert("Please fill all required fields and select dates for each child.");
-        return actions.reject();
-      }
-
-      const anyDatesSelected = [bookingData.child1_dates, bookingData.child2_dates, bookingData.child3_dates].some(arr => arr.length > 0);
-      if (!anyDatesSelected) {
-        alert("Please select at least one date for booking.");
-        return actions.reject();
-      }
-
-      return actions.resolve();
-    },
-
-    createOrder: function(data, actions) {
-      const bookingData = gatherBookingData();
-      let totalAmount = 0;
-      for (let i = 1; i <= 3; i++) {
-        totalAmount += calculatePrice(bookingData[`child${i}_dates`]);
-      }
-
-      if (totalAmount <= 0) {
-        alert("No valid dates selected. Please select at least one date.");
-        return actions.reject();
-      }
-
-      return actions.order.create({
-        purchase_units: [{
-          amount: {
-            currency_code: "GBP",
-            value: totalAmount.toFixed(2)
-          }
-        }]
-      });
-    },
-
-    onApprove: function(data, actions) {
-      return actions.order.capture().then(function(details) {
-        const bookingData = gatherBookingData();
-        bookingData.transactionId = details.id;
-        bookingData.payerName = details.payer.name.given_name + " " + details.payer.name.surname;
-        bookingData.payerEmail = details.payer.email_address;
-        bookingData.paymentStatus = details.status;
-
-        bookingData.total = (
-          calculatePrice(bookingData.child1_dates) +
-          calculatePrice(bookingData.child2_dates) +
-          calculatePrice(bookingData.child3_dates)
-        ).toFixed(2);
-
-        bookingData.child1_dates = bookingData.child1_dates.join(', ');
-        bookingData.child2_dates = bookingData.child2_dates.join(', ');
-        bookingData.child3_dates = bookingData.child3_dates.join(', ');
-
-        return emailjs.send('service_eq9g419', 'template_kw0uijj', bookingData)
-          .then(function() {
-            alert("Payment successful! A confirmation email has been sent.");
-            location.reload();
-          })
-          .catch(function(error) {
-            console.error("EmailJS sending failed:", error);
-            alert("Payment succeeded, but sending confirmation email failed. Please contact us.");
-            location.reload();
-          });
-      }).catch(function(err) {
-        console.error("PayPal capture error:", err);
-        alert("Payment capture failed. Please contact support.");
-      });
-    },
-
-    onError: function(err) {
-      alert("An error occurred during payment. Please try again.");
-      console.error("PayPal error:", err);
-    }
-
-  }).render('#paypal-button-container');
-</script>
-
-<div id="paypal-button-container" style="margin-top: 20px;"></div>
